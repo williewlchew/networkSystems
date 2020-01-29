@@ -58,6 +58,8 @@ int main() {
 
 	printf("The server is ready to receive\n"); 
 	
+	len = sizeof(cliaddr);
+
 	n = recvfrom(sockfd, (char *)rcvbuf, MAXLINE, 
 				0, ( struct sockaddr *) &cliaddr, 
 				&len); 
