@@ -1,0 +1,43 @@
+Client:
++ Create Socket
++ Bind Socket
++ Prompt User
++ Send Datagram
++ Recieve confimation Datagram
+- Handle prompt
+	- get
+		- write <image> data to <metadata> destination
+	- put
+		- read selected file into buffer 
+		- create message: <metadata> <image>
+-- change BUFSIZE to the max of udp packet
+
+
+Server:
++ Create Socket
+	+ Build address
++ Bind Socket
++ Wait for Message
+	+ Recieve Datagram
+	+ Determine who sent
+	- Attempt client action
+		- get
+			- read selected file into buffer 
+			- create message: <name> <size> <image>
+		- put
+			- write <image> data to <metadata> destination
+		- delete
+			- remove promted file
+		- ls
+			- send local directory
+		- exit
+			- exit loop
+		- else repeat message
+	+ Send confirmation Datagram
+
+
+= server parse action 
+= server put
+= client put
+= server get
+= client get 

@@ -22,7 +22,7 @@ Steps:
 #include <errno.h>
 
 #define PORT	 8080 
-#define MAXLINE 1024 
+#define MAXLINE  1024 
 
 // Driver code 
 int main() { 
@@ -49,8 +49,7 @@ int main() {
 	servaddr.sin_port = htons(PORT); 
 	
 	// Bind the socket with the server address 
-	if ( bind(sockfd, (const struct sockaddr *)&servaddr, 
-			sizeof(servaddr)) < 0 ) 
+	if ( bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0 ) 
 	{ 
 		perror("bind failed"); 
 		exit(EXIT_FAILURE); 
@@ -60,9 +59,9 @@ int main() {
 	
 	len = sizeof(cliaddr);
 
-	n = recvfrom(sockfd, (char *)rcvbuf, MAXLINE, 
-				0, ( struct sockaddr *) &cliaddr, 
-				&len); 
+	// Recieve datagram
+	n = recvfrom(sockfd, (char *)rcvbuf, MAXLINE, 0, (struct sockaddr *) &cliaddr, &len); 
+	printf("%d\n",n);
 
 	/* captalize the received string */
 	while (rcvbuf[i]) {
@@ -71,10 +70,10 @@ int main() {
 	}
 	sndbuf[i] = '\0'; 
 
+	// Send a confimation datagram
 	int nc = sendto(sockfd, (const char *)sndbuf, strlen(sndbuf), 
 		0, (const struct sockaddr *) &cliaddr, len); 
 
-	printf("%d\n",nc);
 	printf("%s\n",sndbuf);
 
 	close(sockfd);
