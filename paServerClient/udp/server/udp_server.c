@@ -1,5 +1,5 @@
 /* 
- * udpserver.c - A simple UDP echo server 
+ * udpserver.c - A simple UDP file server by Willie Chew 
  * usage: udpserver <port>
  */
 
@@ -12,8 +12,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <dirent.h>
 
-#define BUFSIZE 1024
+#define BUFSIZE 30000
 
 /*
  * error - wrapper for perror
@@ -23,6 +24,7 @@ void error(char *msg) {
 	exit(1);
 }
 
+/* Write the size of a file to a buffer */
 int filesizeToBuffer(char* filename, char* buffer, int* messageSize, int* fileSize){
 	FILE* fp;
 
@@ -41,6 +43,7 @@ int filesizeToBuffer(char* filename, char* buffer, int* messageSize, int* fileSi
 	return 0;
 }
 
+/* Write the contents of a file to a buffer */
 int fileToBuffer(char* filename, char* buffer, int* messageSize, int fileSize){
     FILE* fp;
 
@@ -56,6 +59,7 @@ int fileToBuffer(char* filename, char* buffer, int* messageSize, int fileSize){
     return 0;
 }
 
+/* Save a chunk of the buffer in the local directory */
 int bufferToFile(char* filename, char* buffer, int* fileSize){
 	FILE* fp;
 
@@ -79,6 +83,8 @@ int main(int argc, char **argv) {
 	int optval; /* flag value for setsockopt */
 
 	/* Message Variables */
+	int msgLength;
+    int fileLength;
 	char buf[BUFSIZE]; /* message buf */
 	int n; /* message byte size */
 	char* datagram[BUFSIZE]; /* the copy of the buffer datagram */
@@ -153,18 +159,44 @@ int main(int argc, char **argv) {
 		* Attempt client action
 		*/
 		strcpy(datagram, buf);
-		parsed = strtok(datagram," ");
+		parsed = strtok(datagram," \n");
 
+		/* Get action */
 		if(strcmp(parsed, "get") == 0)
 		{
-			printf("Get called\n");
+			/* Deconstruct datagram */
+			parsed = strtok(NULL, " \n");
+
+			/* Construct response */
+			msgLength = 0;
+			filesizeToBuffer(parsed, buf, &msgLength, &fileLength);
+			fileToBuffer(parsed, &buf[msgLength], &msgLength, fileLength);
 		}
 
+		/* Put action */
 		else if(strcmp(parsed, "put") == 0)
 		{
-			printf("Put called\n");
+			/* Deconstruct datagram */
+			parsed = strtok(NULL, " \n");
+			fileLength = atoi(strtok(NULL, " \n"));
+
+			bufferToFile(parsed, &buf[n-fileLength], fileLength);
+
+			/* Construct response */
+			sprintf(buf, "Recieved %d of %s\0", fileLength, parsed);
+			msgLength = strlen(buf);
 		}
 
+		/* delete action */
+		else if(strcmp(parsed, "delete") == 0)
+		{
+			parsed = strtok(NULL, " \n");
+			remove(parsed);
+			sprintf(buf, "Removed %s\n", parsed);
+			msgLength = strlen(buf);
+		}
+
+		/* ls action */
 		else if(strcmp(parsed, "ls") == 0)
 		{
 			/* 
@@ -175,17 +207,29 @@ int main(int argc, char **argv) {
 			char cwd[PATH_MAX];
 			getcwd(cwd, sizeof(cwd));
 			struct dirent *ent;
+
+			sprintf(buf, "Local Directory: \n");
+			//msgLength = 18;
 			if ((dir = opendir (cwd)) != NULL) 
 			{
 				/* print all the files and directories within directory */
 				while ((ent = readdir (dir)) != NULL) 
 				{
-					printf ("%s\n", ent->d_name);
+					strcat(buf, ent->d_name);
+					strcat(buf, "\n");
 			    }
 		    	closedir (dir);
-		    } 
+		    }
+		    msgLength = strlen(buf);
 		}
 
+		/* exit action */
+		else if(strcmp(parsed, "exit") == 0){
+			sprintf(buf, "Shutting down server...\n");
+			msgLength = strlen(buf);
+		}
+
+		/* Unrecognizable command */
 		else 
 		{
 			printf("Unrecognizable command\n");
@@ -194,7 +238,7 @@ int main(int argc, char **argv) {
 		/* 
 		 * sendto: echo the input back to the client 
 		 */
-		n = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr *) &clientaddr, clientlen);
+		n = sendto(sockfd, buf, msgLength, 0, (struct sockaddr *) &clientaddr, clientlen);
 		if (n < 0) 
 			error("ERROR in sendto");
 	}

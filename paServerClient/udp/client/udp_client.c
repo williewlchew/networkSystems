@@ -1,5 +1,5 @@
 /* 
- * udpclient.c - A simple UDP client
+ * udp_client.c - A simple UDP file transfer client by Willie Chew 
  * usage: udpclient <host> <port>
  */
 #include <stdio.h>
@@ -12,7 +12,7 @@
 #include <netdb.h> 
 #include <dirent.h>
 
-#define BUFSIZE 1024
+#define BUFSIZE 30000
 
 /* 
  * error - wrapper for perror
@@ -22,45 +22,7 @@ void error(char *msg) {
     exit(0);
 }
 
-/*
-* example code to test fuctions
-*/
-void extras(){
-    char* filename = "foo2";
-    FILE* fp;
-    char bigBuf[6000];
-    int filesize = 0;
-
-    fp = fopen(filename, "r");
-    if(fp == NULL)
-        fprintf(stderr, "Cannot open file\n");
-    fseek(fp, 0L, SEEK_END);
-	filesize = ftell(fp);
-	fseek(fp, 0L, SEEK_SET);
-
-    fread(&bigBuf, 1, filesize, fp);
-    fprintf(stderr, "foo2: %d\n",strlen(bigBuf));
-    fclose(fp);
-
-    fp = fopen("shouldwork", "w+");
-    if(fp == NULL)
-        fprintf(stderr, "Cannot open file\n");
-    fwrite (&bigBuf, 1, filesize, fp);
-    fclose(fp);
-    
-    DIR *dir;
-    char cwd[PATH_MAX];
-    getcwd(cwd, sizeof(cwd));
-    struct dirent *ent;
-    if ((dir = opendir (cwd)) != NULL) {
-      /* print all the files and directories within directory */
-      while ((ent = readdir (dir)) != NULL) {
-        printf ("%s\n", ent->d_name);
-      }
-      closedir (dir);
-    } 
-}
-
+/* Write the size of a file to a buffer */
 int filesizeToBuffer(char* filename, char* buffer, int* messageSize, int* fileSize){
 	FILE* fp;
 
@@ -79,6 +41,7 @@ int filesizeToBuffer(char* filename, char* buffer, int* messageSize, int* fileSi
 	return 0;
 }
 
+/* Write the contents of a file to a buffer */
 int fileToBuffer(char* filename, char* buffer, int* messageSize, int fileSize){
     FILE* fp;
 
@@ -94,6 +57,7 @@ int fileToBuffer(char* filename, char* buffer, int* messageSize, int fileSize){
     return 0;
 }
 
+/* Save a chunk of the buffer in the local directory */
 int bufferToFile(char* filename, char* buffer, int* fileSize){
 	FILE* fp;
 
@@ -152,53 +116,76 @@ int main(int argc, char **argv) {
     serverlen = sizeof(serveraddr);
     while(1)
     {            
-        /* TEMP :: get a message from the user */
+    	/* Promt the user */
         bzero(buf, BUFSIZE);
         printf("Please enter msg: ");
         fgets(buf, BUFSIZE, stdin);
         msgLength = strlen(buf);
 		buf[msgLength-1] =  ' \n';
         
-        /* ATTEMPT CLIENT ACTION */
+        /* Parse the first word to get the action */
         msgLength = strlen(buf);
         strcpy(datagram, buf);
 		parsed = strtok(datagram," \n");
+
+		/* Process get action */
 		if(strcmp(parsed, "get") == 0)
 		{
-			/* Construct datagram */
-			parsed = strtok (NULL, " \n");
+			// parse the file name
+			parsed = strtok(NULL, " \n"); 
+
+			/* Send get request */
+			n = sendto(sockfd, buf, msgLength, 0, &serveraddr, serverlen);
+	        if (n < 0) 
+	          error("ERROR in sendto");
+
+			/* Recieve datagram */
+			n = recvfrom(sockfd, buf, BUFSIZE, 0, &serveraddr, &serverlen);
+	        if (n < 0) 
+	          error("ERROR in recvfrom");
+	      	buf[n] = '\0';
+
+			/* 
+				Write to file the contents of the recieved packet
+				Recieved packet in format: <file size> <file contents>
+			*/
+			// parse the file length
+			fileLength = atoi(strtok(buf, " \n")); 
+			bufferToFile(parsed, &buf[n-fileLength], fileLength);
+			printf("Recieved %d bytes\n", n);
+		}
+
+		/* Process put action */
+		else if(strcmp(parsed, "put") == 0)
+		{
+			/* 
+				Construct datagram by adding file size and file content to user promt 
+				Packet format: <action> <file name>  <file size> <file contents>
+			*/
+			// parse the file name
+			parsed = strtok (NULL, " \n"); 
 			// end character to space
 			buf[msgLength-1] =  ' ';
 			filesizeToBuffer(parsed, &buf[msgLength], &msgLength, &fileLength);
-			printf("fileLength: %d\n", fileLength);
 			fileToBuffer(parsed, &buf[msgLength], &msgLength, fileLength);
-			
-			/* Send the datagram off */
-			printf("Message: %s %d %d\n", buf, strlen(buf), msgLength);
+			/* packet  */
 
-			/* temp to simulate server */
-			bufferToFile("shouldwork2", &buf[msgLength-fileLength], fileLength);
+			/* Send datagram */
+			n = sendto(sockfd, buf, msgLength, 0, &serveraddr, serverlen);
+	        if (n < 0) 
+	          error("ERROR in sendto");
 
 			/* Await Confirmation */
-			n = recvfrom(sockfd, buf, strlen(buf), 0, &serveraddr, &serverlen);
+			n = recvfrom(sockfd, buf, BUFSIZE, 0, &serveraddr, &serverlen);
 	        if (n < 0) 
 	          error("ERROR in recvfrom");
-	        printf("Echo from server: %s", buf);
+
+	      	/* End current message and output */
+	      	buf[n] = '\0';
+	        printf("Response from server: %s \n", buf);
 		}
 
-		else if(strcmp(parsed, "put") == 0)
-		{
-			printf("Put called\n");
-			break;
-		}
-
-		else if(strcmp(parsed, "extra") == 0)
-		{
-			extras();
-			printf("%s\n", buf);
-			break;
-		}
-
+		/* Process all other actions */
 		else 
 		{
 			/* Send message */
@@ -207,10 +194,10 @@ int main(int argc, char **argv) {
 	          error("ERROR in sendto");
 	        
 	        /* print the server's reply */
-	        n = recvfrom(sockfd, buf, strlen(buf), 0, &serveraddr, &serverlen);
+	        n = recvfrom(sockfd, buf, BUFSIZE, 0, &serveraddr, &serverlen);
 	        if (n < 0) 
 	          error("ERROR in recvfrom");
-	        printf("Echo from server: %s", buf);
+	        printf("Response from server: %s\n", buf);
 		}
     }
     return 0;
