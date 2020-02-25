@@ -41,3 +41,11 @@ Server:
 = client put
 = server get
 = client get 
+
+
+--------------------------------
+IMPORTANTS:
+
+scp <source> <dest>
+ssh wich2986@elra-01
+ip addr
