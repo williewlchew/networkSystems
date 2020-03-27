@@ -49,3 +49,5 @@ IMPORTANTS:
 scp <source> <dest>
 ssh wich2986@elra-01
 ip addr
+
+(echo -en "GET /index.html HTTP/1.1\r\nHost: localhost\r\nConnection: Keep-alive\r\n\r\n"; sleep 10; echo -en "GET /index.html HTTP/1.1\r\nHost: localhost\r\n\r\n") | telnet 127.0.0.1 8080

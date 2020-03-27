@@ -1,6 +1,6 @@
 
 /* 
- * tcpechosrv.c - A concurrent TCP echo server using threads
+ * httpServer.c - A simple TCP web server with threads by Willie Chew
  */
 
 #include <stdio.h>
@@ -19,13 +19,13 @@
 #define LISTENQ  1024  /* second argument to listen() */
 
 /* make-shift header */
-int open_listenfd(int port);
-void *thread(void *vargp);
-void echo(int connfd);
-void nextWord(char* buffer, char* dest, int start, int limit);
-void parseAction(char* buffer, char* action, char* location, char* version, int* n);
-const char* get_filename_ext(const char* filename);
-void fileDataToBuffer(FILE* stream, char* buffer, int* n, int* filesize, char* path);
+int open_listenfd(int port); /* open and listen to a socket */
+void *thread(void *vargp); /* start a new thread to handel a new request */
+void processRequest(int connfd); /* process the request given from a socket */
+void nextWord(char* buffer, char* dest, int start, int limit); /* parse the next word in the specifed location in a buffer */
+void parseAction(char* buffer, char* action, char* location, char* version, int* n); /* parse out relevant information in a request */
+const char* get_filename_ext(const char* filename); /* convert the extension of the requested docuemnt to the content type constant */
+void fileDataToBuffer(FILE* stream, char* buffer, int* n, int* filesize, char* path); /* write the contents of a specified file into a buffer */
 
 int main(int argc, char **argv) 
 {
@@ -81,24 +81,26 @@ int open_listenfd(int port)
     if (listen(listenfd, LISTENQ) < 0)
         return -1;
     return listenfd;
-} /* end open_listenfd */
+} 
 
 
-/* thread routine */
+/* 
+* start a new thread to handel a new request 
+*/
 void * thread(void * vargp) 
 {  
     int connfd = *((int *)vargp);
     pthread_detach(pthread_self()); 
     free(vargp);
-    echo(connfd);
+    processRequest(connfd);
     close(connfd);
     return NULL;
 }
 
-/*
- * echo - read and echo text lines until client closes connection
- */
-void echo(int connfd) 
+/* 
+* process the request given from a socket 
+*/
+void processRequest(int connfd) 
 {
     int n; 
     char buf[MAXLINE]; 
@@ -110,13 +112,13 @@ void echo(int connfd)
     char version[100] = "";
     parseAction(buf, &action, &location[1], &version, &n); 
 
-    /* check validity of path */
+    /* check validity of path; return an error message if file not found */
     FILE* fp = fopen(location, "r");
     if (fp == NULL)
     {
         sprintf(buf, version);
         n = strlen(buf);
-        sprintf(&buf[n], " 404 Document Not Found\r\n");
+        sprintf(&buf[n], " 500 Internal Server Error\r\n");
         n = strlen(buf);
         write(connfd, buf, n);
         printf("Sent:\n%s", buf);
@@ -152,6 +154,9 @@ void echo(int connfd)
 *	WORD PARSING
 */
 
+/*
+* parse the next word in the specifed location in a buffer
+*/
 void nextWord(char* buffer, char* dest, int start, int limit)
 {
     char charDump = buffer[start];
@@ -169,6 +174,9 @@ void nextWord(char* buffer, char* dest, int start, int limit)
     return;
 }
 
+/*
+* parse out relevant information in a request
+*/
 void parseAction(char* buffer, char* action, char* location, char* version, int* n)
 {
     /* PARSE ACTION */
@@ -224,6 +232,9 @@ const char* get_filename_ext(const char* filename) {
     return "";
 }
 
+/*
+* write the contents of a specified file into a buffer
+*/
 void fileDataToBuffer(FILE* stream, char* buffer, int* n, int* filesize, char* path)
 {
     /* get the file type*/
@@ -239,77 +250,3 @@ void fileDataToBuffer(FILE* stream, char* buffer, int* n, int* filesize, char* p
 
     return;
 }
-
-/*
-void processAction(char* action, char* location, char* buffer, char* version , int* n)
-{
-    FILE* fp;
-
-    fp = fopen(location, "r");
-    if(fp == NULL)
-        sprintf(&buffer, "HTTP/1.1 500 Internal Server Error\r\n");
-    	*n = 38;
-        return;
-
-    int filesize = 0;
-    sprintf(&buffer[0], version);
-    *n = strlen(buffer);
-    sprintf(&buffer[*n], " 200 Document Follows\r\n");
-    *n = strlen(buffer);
-    fileDataToBuffer(fp, &buffer[*n], n, &filesize, location);
-    fileToBuffer(fp, &buffer[*n], n, &filesize, location);
-
-    return; 
-}
-*/
-/* test cases */
-/*
-void testing()
-{
-    int n = 250;
-    char buf[250] = "GET /images/wine3.jpg HTTP/1.1\r\nHost: localhost:5050\r\nUser-Agent: curl/7.58.0\r\nAccept: *\r\n";
-    char action[100] = "";
-    char location[100] = ".";
-
-    /////////////
-    printf("\nTesting parseAction\n");
-    parseAction(buf, &action, &location[1], &n);
-    printf("action: %s\n", action);
-    printf("location: %s\n", location);
-
-    /////////////
-    printf("\nTesting get_filename_ext\n");
-	printf("%s\n", get_filename_ext("test.html"));
-    printf("%s\n", get_filename_ext("test.txt"));
-    printf("%s\n", get_filename_ext("test.png"));
-    printf("%s\n", get_filename_ext("test.gif"));
-    printf("%s\n", get_filename_ext("test.jpg"));
-    printf("%s\n", get_filename_ext("test.css"));
-    printf("%s\n", get_filename_ext("test.js"));
-    printf("%s\n", get_filename_ext("test.fig"));
-
-    /////////////
-    printf("\nTesting fileDataToBuffer\n");
-    /*
-    processAction(action, location, &buf[0], &n);
-    printf("buffer: \n%s\n", buf);
-    printf("msg size: %d\n", n);
-    
-
-    printf("\nTesting fileDataToBuffer\n");
-    n = 31;
-    sprintf(buf, "HTTP/1.1 200 Document Follows\r\n");
-    int filesize = 0;
-    FILE* fp = fopen(location, "r");
-
-    fileDataToBuffer(fp, &buf[n], &n, &filesize, location);
-    printf("buffer: \n%s\n", buf);
-    printf("msg size: %d\n", n);
-    
-}
-*/
-
-
-////////////////////// class note
-// understand 4 tupel concept
-//(echo -en "GET /index.html HTTP/1.1\r\nHost: localhost\r\nConnection: Keep-alive\r\n\r\n"; sleep 10; echo -en "GET /index.html HTTP/1.1\r\nHost: localhost\r\n\r\n") | telnet localhost 5050
