@@ -28,9 +28,7 @@ const char* get_filename_ext(const char* filename); /* convert the extension of 
 void fileDataToBuffer(FILE* stream, char* buffer, int* n, int* filesize, char* path); /* write the contents of a specified file into a buffer */
 
 int main(int argc, char **argv) 
-{
-    //testing();
-    
+{    
     int listenfd, *connfdp, port, clientlen=sizeof(struct sockaddr_in);
     struct sockaddr_in clientaddr;
     pthread_t tid; 

@@ -1,0 +1,121 @@
+Planning
+
+############
+Goals:
+1. Client Handling
+	a. accept TCP connection with client
+	b. parse and check HTTP method validity & blacklist
+	c. check cached files
+	d. check if URL exists
+		+ gethostbyname()
+		+ throw 400 if dosnt exist
+	-- Server Handling --
+	e. cache results
+	f. write to client results from server
+
+2. Server Handling
+	a. construct request with remote port
+	b. establish TCP connection with server host
+	c. send request
+	d. get reply
+
+
+###########
+Process:
+
+main:
+	listen on port p 
+	if connection, make new thread 1a 
+
+thread:		+++++++++
+	process client request(processClientRequest) 1b, 1c, 1d
+		+ connid
+		+ &buffer <- fill buffer with formatted request
+			= shouldnt need to track size
+	send request to server(getServerResponse) 2a, 2b, 2c, 2d
+		+ &buffer <- request goes in, reply comes out
+			= web address should be in there
+	forward resuts to client(forwardServerResponse) 2d, 1e, 1f
+		+ &buffer
+
+processClientRequest(connid, buffer*):
+	buffer = read(connid)
+	host, path, body = parse(buffer)
+	
+	if inBlacklist(host):		+++++++++
+		return 403
+
+	cacheResult = inCache(host, path)		+++++++++
+	if cacheResult != NULL:
+		return cache
+
+	addy = gethostbyname(host)		+++++++++
+	if addy = NULL:
+		return 400
+
+	buffer = addy, path, body
+	return 200
+
+
+getServerResponse(buffer*):
+	connid = connect to server
+	sendto(connid, &buffer)
+	recvfrom(connid, &buffer)
+
+forwardServerResponse(buffer*):
+	sendto(connid, &buffer)
+	cache(&buffer, addy, path)		+++++++++
+
+-------------------------------------
+
+cacheObject:
+	host
+	path
+	filestream*
+	accessed
+	next
+
+## blacklist = int[100] all set to -1
+inBlacklist(host, path):
+	hashCode = hash(host, path)
+	loop thru blacklist until end or -1
+		if hashCode == blacklist[i]
+			reutrn true
+	return false
+
+## hashTable = cacheObject*[100] all set to NULL
+inCache(host, path):
+	hashCode = hash(host, path)
+	result = hashTable[hashCode]
+	while host != result.host && path != result.pah:
+		result = resutl.next
+	return result
+
+cache(&buffer, addy, path):
+	hashCode = hash(host, path)
+	newObj = cacheObject
+	newObj.host = host
+	newObj.path = path
+	newObj.contents = new filestream*
+	newObj.contents.write(buffer)
+	newObj.accessed = time.now
+	
+	if(hashTable[hashCode] == null):
+		hashTable[hashCode] = newObj
+
+	else:
+		cur* = hashTable[hashCode]
+		while cur*.next != NULL
+			cur* = cur*.next
+		cur*.next = newObj
+
+
+
+--------------------------------
+Test Requests
+--------------------------------
+
+GET https://www.google.com HTTP/1.0
+
+GET https://www.google.com/imghp HTTP/1.0  user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.75 Safari/537.36
+
