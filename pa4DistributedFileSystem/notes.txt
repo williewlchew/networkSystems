@@ -1,0 +1,150 @@
+Distribued file system and secure file storage
+	- file pieces saved on mulitple servers
+	- reliable if a server goes down
+
+-------------
+Order
+	+ DFC
+		- init 
+			- read and parse dfc.conf
+			- timeout/server not avaliable
+		- read commands
+			- list
+			- get 
+			- put
+		- upload capabilities
+			- file split in to 4 pieces
+			- goups 4 pieces in to 4 pairs
+				- redundancy
+			- uploads to separate DFS
+				- MD5 hash of file
+	+ DFS 
+		+ file structure
+			- each running port must have its own directory
+		- init
+			- dfs <opreating directory> <port>
+			- read dfs.conf to see who's verified
+		- verify clear text username and password
+		+ handel multiple connections
+			- verified connected users have their own folders
+		+ accepting files
+			- path: <dfs server>/<user>/.<filename>.<piece order>
+
+
+
+------------------
+Compiling Sandbox:
+	gcc sand.c -o a -lcrypto -lssl
+
+
+--------------------
+DFC Parts
+processConfig(fp, connections, username, password):
+	for i in 0:4
+		l = read(fp)
+		connections[i] = connect(l)
+	username = read(fp)
+	password = read(fp)
+
+getFile(file, fp, breaks, size):
+	fp = open(filename)
+	size = size(fp)
+	breaks = file.size/4
+	size = file.size/4 + left
+	start = 0
+
+uploadFile(filename, connections, sendMap):
+	destCode = hash(filename)%4
+	fp, breaks, size = getFile(filename)
+
+	for destServer in 0:4:
+		parts1 = sendMap[destCode][destServer][0]
+		parts2 = sendMap[destCode][destServer][1]
+
+		metadata1 = "<name>.parts1 <breaks> \n"
+		send(connection[i], metadata1)
+		while(readline(fp, end = parts1 * breaks))
+			send(connection[i], parts1-1)
+
+		metadata2 = "<name>.parts2 <breaks> \n"
+		send(connection[i], metadata2)
+		while(readline(fp, end = parts2 * breaks))
+			send(connection[i], parts2-1)
+
+recieveFile(filename, connections, sendMap):
+	request = #format request
+	destCode = hash(filename)%4
+	parts = [0,0,0,0]
+
+	for destServer in 0:4:
+		send(connection, request)
+		poll:
+			recPart = recv(connection[destServer]) #"<part> <size>"
+			# check part
+			size = recPart[size]
+			recSize = 0
+			while(size > recSize):
+				recSize += recv(connection[destServer], buf)
+				append(filename.<part>, buf)
+			# mark part
+
+		poll:
+			recPart = recv(connection[destServer]) #"<part> <size>"
+			# check part
+			size = recPart[size]
+			recSize = 0
+			while(size > recSize):
+				recSize += recv(connection[destServer], buf)
+				append(filename.<part>, buf)
+			# mark part
+
+reconstructFile(filename):
+	# open the main file
+	for i in 0:4:
+		#read the ith part of the file
+		# append it to the main
+		# remove from temp
+
+listFiles():
+	storedNames[]
+	storedData[][]
+	for i in 0:4:
+		# send request
+		# rec request in buffer
+
+main():
+	open tcp connections to servers
+	# command parser from pa1
+
+
+
+
+-----------------------
+DFS Parts
+
+processConfig(authorisedUsers*):
+	# make sure file structure is right
+	
+	while config has lines:
+		authorisedUsers[hash(line)] = 1
+
+main():
+	# open listening port
+	# thread when new connection
+
+thread():
+	# parse request
+	if get:
+		# find file
+		# respond
+	if post:
+		# paste fle
+		# respond
+	if list:
+		list dir from pa1
+
+verifyUser(name, password, authList):
+	temp = name + password
+	if(authList[hash(temp)] == true)
+		return 1
+	return 0
